@@ -1,0 +1,55 @@
+/* ===== Variables ===== */
+:root {
+  /* Paleta original del layout */
+  --c-dark-1: #16163C;
+  /* header superior */
+  --c-dark-2: #141666;
+  /* barra menú / panel derecho */
+  --c-mid: #6465BB;
+  /* acentos / hover */
+  --c-soft: #A1A2E6;
+  /* fondo de página */
+  --c-pill: #DDDEFF;
+  /* inputs pastilla */
+  --c-soft-2: #C4C4FF;
+  /* detalles suaves */
+
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  /* Paleta extendida (sistema de botones / badges) */
+  --brand-900: #141666;
+  --brand-800: #16163C;
+  --brand-600: #6465BB;
+  --brand-300: #A1A2E6;
+  --brand-100: #DDDEFF;
+
+  --text: #141666;
+  --muted: #7b7e9a;
+  --white: #fff;
+
+  --danger: #b91c1c;
+  --danger-900: #8f1212;
+
+  --ok-bg: #e6f7ed;
+  --ok-fg: #0f5132;
+  --ok-bd: #b7ebc6;
+  --low-bg: #fff4e6;
+  --low-fg: #8a4b08;
+  --low-bd: #ffd9a0;
+  --crit-bg: #fde7e7;
+  --crit-fg: #7f1d1d;
+  --crit-bd: #f5b5b5;
+
+  /* Botones */
+  --btn-radius: 14px;
+  --btn-pad-y: 10px;
+  --btn-pad-x: 14px;
+  --btn-gap: 8px;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show>.nav-link {
+  color: var(--white);
+  background-color: var(--brand-600);
+}
