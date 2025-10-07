@@ -124,9 +124,6 @@ export default function Prestamos() {
     // ---------- izquierda (form) ----------
     const left = (
         <Form onSubmit={handleDevolver}>
-            <h6 className="text-uppercase fw-bold mb-3" style={{ color: "var(--text)" }}>
-                Devolución
-            </h6>
 
             {flash && (
                 <Alert

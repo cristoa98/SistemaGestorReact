@@ -1,24 +1,17 @@
 /* ===== Variables ===== */
 :root {
-  /* Paleta original del layout */
-  --c-dark-1: #16163C;
-  /* header superior */
-  --c-dark-2: #141666;
-  /* barra menú / panel derecho */
-  --c-mid: #6465BB;
-  /* acentos / hover */
-  --c-soft: #A1A2E6;
-  /* fondo de página */
-  --c-pill: #DDDEFF;
-  /* inputs pastilla */
-  --c-soft-2: #C4C4FF;
-  /* detalles suaves */
+  /* Color Principal - Header */
+  --c-dark-1: #151565;
+  /* Color Secundario */
+  --c-dark-2: #343690;
+  /* Color Terciario */
+  --c-mid: #a0a0e5;
 
+  /* detalles suaves */
   --radius-xl: 20px;
   --radius-2xl: 28px;
 
   /* Paleta extendida (sistema de botones / badges) */
-  --brand-900: #141666;
   --brand-800: #16163C;
   --brand-600: #6465BB;
   --brand-300: #A1A2E6;

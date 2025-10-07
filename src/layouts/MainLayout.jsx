@@ -9,7 +9,7 @@ export default function MainLayout() {
             {/* Barra superior (título centrado) */}
             <Navbar expand="lg" style={{ backgroundColor: "var(--c-dark-1)" }}>
                 <Container className="justify-content-center">
-                    <Navbar.Brand className="fw-bold text-uppercase" style={{ color: "var(--white)" }}>
+                    <Navbar.Brand className="fs-1 fw-bold text-uppercase" style={{ color: "var(--white)" }}>
                         Gestor Local
                     </Navbar.Brand>
                 </Container>
@@ -26,8 +26,8 @@ export default function MainLayout() {
                                 ["Solicitudes", "/solicitudes"],
                                 ["Inventario", "/inventario"],
                                 ["Préstamos", "/prestamos"],
-                                ["Trazabilidad", "/trazabilidad"],
-                                ["Reportes", "/reportes"],
+                                /* ["Trazabilidad", "/trazabilidad"],
+                                ["Reportes", "/reportes"], */
                                 ["Usuarios", "/usuarios"],
                             ].map(([label, to]) => (
                                 <LinkContainer key={to} to={to} end={to === "/"}>
@@ -47,11 +47,11 @@ export default function MainLayout() {
             </Navbar>
 
             {/* Lienzo central más ancho (xxl) */}
-            <div className="py-4" style={{ backgroundColor: "var(--c-mid)" }}>
+            <div className="py-4" style={{ minHeight: 654, backgroundColor: "var(--c-mid)" }}>
                 <Container fluid="xxl">
                     <Card className="shadow-lg border-0"
                         style={{ borderRadius: "var(--radius-2xl)", backgroundColor: "var(--white)" }}>
-                        <Card.Body className="p-4 p-md-5">
+                        <Card.Body className="p-4 p--5">
                             <Outlet />
                         </Card.Body>
                     </Card>
