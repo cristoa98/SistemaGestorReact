@@ -3,7 +3,7 @@ import MainLayout from './layouts/MainLayout';
 
 export default function App() {
   return (
-    <MainLayout>
+    <MainLayout className="container-fluid p-0 m-0 text-center mx-auto">
       <Outlet />
     </MainLayout>
   );

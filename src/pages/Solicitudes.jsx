@@ -1,169 +1,542 @@
-// src/pages/Requests.jsx
-import { useMemo, useState } from "react";
-import { Form, Button, ButtonGroup, Table, Badge } from "react-bootstrap";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+import {
+    Form,
+    Button,
+    Table,
+    Badge,
+    ButtonGroup,
+    Alert,
+    Spinner,
+} from "react-bootstrap";
 import FormTableShell from "../components/FormTableShell";
+import { useApi } from "../hooks/useApi";
+import { useAuth } from "../context/AuthContext";
 
-const TIPOS = [
-    { value: "", label: "Seleccione..." },
-    { value: "prestamo", label: "Préstamo" },
-    { value: "devolucion", label: "Devolución" },
-    { value: "baja", label: "Baja" },
-];
-const PERSONAS = [
-    { value: "", label: "Seleccione..." },
-    { value: "Juan Pérez", label: "Juan Pérez" },
-    { value: "Prof. Díaz", label: "Prof. Díaz" },
-    { value: "María Soto", label: "María Soto" },
-];
-const ESTADOS = {
-    CREADA: "CREADA",
-    APROBADA: "APROBADA",
-    RECHAZADA: "RECHAZADA",
-    PRESTAMO_EMITIDO: "PRÉSTAMO EMITIDO",
-    BAJA: "BAJA",
+const emptyForm = {
+    tipo: "prestamo",
+    persona: "",
+    email: "",
+    itemId: "",
+    cantidad: 1,
+    fechaUso: "",
+    observacion: "",
 };
-const initialRows = [
-    { id: 1, descripcion: "Multímetro", tipo: "prestamo", cantidad: 1, persona: "Juan Pérez", observacion: "Uso en clase", estado: ESTADOS.CREADA },
-    { id: 2, descripcion: "Set de cables", tipo: "prestamo", cantidad: 3, persona: "Prof. Díaz", observacion: "Laboratorio", estado: ESTADOS.CREADA },
-];
+
+function normalizeItem(raw) {
+    return {
+        id: raw.id || raw._id,
+        descripcion: raw.descripcion || "",
+    };
+}
+
+function estadoVariant(estado) {
+    switch ((estado || "").toLowerCase()) {
+        case "aprobada":
+            return "success";
+        case "rechazada":
+            return "danger";
+        case "completa":
+            return "secondary";
+        default:
+            return "warning"; // pendiente u otro
+    }
+}
+
+function normalizeRequest(raw, itemsMap) {
+    const itemField = raw.item;
+    let itemId = null;
+    let itemNombre = "No especificado";
+
+    if (typeof itemField === "string") {
+        itemId = itemField;
+        if (itemsMap[itemId]) itemNombre = itemsMap[itemId].descripcion;
+    } else if (itemField) {
+        itemId = itemField.id || itemField._id;
+        itemNombre = itemField.descripcion || itemNombre;
+    }
+
+    return {
+        id: raw.id || raw._id,
+        tipo: raw.tipo || "prestamo",
+        persona: raw.persona || "",
+        itemId,
+        itemNombre,
+        cantidad: Number(raw.cantidad ?? 0) || 0,
+        estado: raw.estado || "pendiente",
+        observacion: raw.observacion || "",
+        creado: raw.createdAt ? String(raw.createdAt).slice(0, 10) : "",
+    };
+}
 
 export default function Solicitudes() {
-    const [rows, setRows] = useState(initialRows);
+    const { api, token } = useApi();
+    const { isAuthenticated, user } = useAuth();
+
+    const canManage =
+        isAuthenticated && (user?.rol === "admin" || user?.rol === "encargado");
+    const canDelete = isAuthenticated && user?.rol === "admin";
+
+    const [items, setItems] = useState([]);
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    const [flash, setFlash] = useState(null);
+    const [filter, setFilter] = useState("");
     const [selectedId, setSelectedId] = useState(null);
-    const emptyForm = useMemo(() => ({ descripcion: "", tipo: "", cantidad: 1, observacion: "", persona: "" }), []);
     const [form, setForm] = useState(emptyForm);
-    const isEditing = selectedId !== null;
 
-    const badgeVariant = (estado) => {
-        if (estado === ESTADOS.CREADA) return "warning";
-        if (estado === ESTADOS.APROBADA) return "success";
-        if (estado === ESTADOS.RECHAZADA) return "danger";
-        if (estado === ESTADOS.PRESTAMO_EMITIDO) return "primary";
-        if (estado === ESTADOS.BAJA) return "secondary";
-        return "light";
-    };
+    const loadData = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
 
-    const handleSelect = (id) => {
-        const r = rows.find((x) => x.id === id);
-        if (!r) return;
-        setSelectedId(id);
-        setForm({ descripcion: r.descripcion, tipo: r.tipo, cantidad: r.cantidad, observacion: r.observacion, persona: r.persona });
-    };
-    const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+            const [itemsResp, reqsResp] = await Promise.all([
+                api("/items"),
+                api("/requests"),
+            ]);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!form.tipo || !form.descripcion.trim() || !form.persona || !form.cantidad) return;
+            const normalizedItems = itemsResp.map(normalizeItem);
+            setItems(normalizedItems);
 
-        if (isEditing) {
-            setRows((p) => p.map((x) => (x.id === selectedId ? { ...x, ...form } : x)));
-        } else {
-            const nextId = rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1;
-            setRows((p) => [...p, { id: nextId, ...form, estado: ESTADOS.CREADA }]);
+            const itemsMap = Object.fromEntries(
+                normalizedItems.map((i) => [i.id, i])
+            );
+
+            const normalizedReqs = reqsResp.map((r) =>
+                normalizeRequest(r, itemsMap)
+            );
+            setRows(normalizedReqs);
+        } catch (err) {
+            setError(err.message || "Error al cargar solicitudes.");
+        } finally {
+            setLoading(false);
         }
+    }, [api]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const selected = rows.find((r) => r.id === selectedId) || null;
+
+    const filteredRows = useMemo(() => {
+        if (!filter.trim()) return rows;
+        const q = filter.toLowerCase();
+        return rows.filter(
+            (r) =>
+                r.persona.toLowerCase().includes(q) ||
+                r.itemNombre.toLowerCase().includes(q) ||
+                r.estado.toLowerCase().includes(q) ||
+                r.tipo.toLowerCase().includes(q)
+        );
+    }, [rows, filter]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setForm((f) => ({ ...f, [name]: value }));
+    };
+
+    const resetForm = () => {
         setSelectedId(null);
         setForm(emptyForm);
+        setFlash(null);
     };
-    const handleCancel = () => { setSelectedId(null); setForm(emptyForm); };
-    const setEstado = (nuevo) => selectedId && setRows((p) => p.map((x) => (x.id === selectedId ? { ...x, estado: nuevo } : x)));
-    const handleDelete = () => { if (!selectedId) return; setRows((p) => p.filter((x) => x.id !== selectedId)); handleCancel(); };
 
-    const selectedRow = rows.find((r) => r.id === selectedId) || null;
-    const canTransitionFromCreada = selectedRow && selectedRow.estado === ESTADOS.CREADA;
-    const canEmitirPrestamo = selectedRow && (selectedRow.estado === ESTADOS.CREADA || selectedRow.estado === ESTADOS.APROBADA);
+    const handleSelect = (row) => {
+        setSelectedId(row.id);
+        setForm((f) => ({
+            ...f,
+            tipo: row.tipo || "prestamo",
+            persona: row.persona,
+            itemId: row.itemId || "",
+            cantidad: row.cantidad,
+            observacion: row.observacion,
+        }));
+        setFlash(null);
+    };
 
-    // ------- Left (form) -------
+    const validateForm = () => {
+        if (!form.tipo) return "El tipo de solicitud es obligatorio.";
+        if (!form.persona.trim()) return "La persona solicitante es obligatoria.";
+        if (!form.itemId) return "Debes seleccionar un equipo.";
+        const cantidad = Number(form.cantidad);
+        if (!cantidad || cantidad <= 0) {
+            return "La cantidad debe ser un número mayor a 0.";
+        }
+        return null;
+    };
+
+    const ensureCanManage = () => {
+        if (!canManage) {
+            setFlash({
+                type: "warning",
+                msg: "Solo admin/encargado autenticados pueden crear o actualizar solicitudes.",
+            });
+            return false;
+        }
+        return true;
+    };
+
+    const buildObservacion = () => {
+        let parts = [];
+        if (form.email.trim()) parts.push(`email: ${form.email.trim()}`);
+        if (form.fechaUso) parts.push(`fechaUso: ${form.fechaUso}`);
+        if (form.observacion.trim()) parts.push(form.observacion.trim());
+        return parts.join(" | ");
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setFlash(null);
+
+        const msg = validateForm();
+        if (msg) {
+            setFlash({ type: "danger", msg });
+            return;
+        }
+
+        if (!ensureCanManage()) return;
+
+        const payload = {
+            tipo: form.tipo, // "prestamo" | "devolucion" | "baja"
+            persona: form.persona.trim(),
+            item: form.itemId,
+            cantidad: Number(form.cantidad) || 0,
+            observacion: buildObservacion(),
+        };
+
+        try {
+            setSaving(true);
+            // API solo tiene POST + PATCH status, no PUT general
+            await api("/requests", {
+                method: "POST",
+                body: payload,
+            });
+            setFlash({
+                type: "success",
+                msg: "Solicitud creada correctamente.",
+            });
+
+            resetForm();
+            await loadData();
+        } catch (err) {
+            setFlash({
+                type: "danger",
+                msg: err.message || "No se pudo guardar la solicitud.",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const updateEstado = async (row, nuevoEstado) => {
+        if (!ensureCanManage()) return;
+        try {
+            setSaving(true);
+            await api(`/requests/${row.id}/status`, {
+                method: "PATCH",
+                body: { estado: nuevoEstado }, // pendiente|aprobada|rechazada|completa
+            });
+            setFlash({
+                type: "success",
+                msg: `Estado actualizado a ${nuevoEstado}.`,
+            });
+            await loadData();
+        } catch (err) {
+            setFlash({
+                type: "danger",
+                msg: err.message || "No se pudo actualizar el estado.",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!selectedId) return;
+        if (!canDelete) {
+            setFlash({
+                type: "warning",
+                msg: "Solo admin puede eliminar solicitudes.",
+            });
+            return;
+        }
+
+        if (
+            !window.confirm(
+                "¿Eliminar la solicitud seleccionada? Esta acción es irreversible."
+            )
+        ) {
+            return;
+        }
+
+        try {
+            setSaving(true);
+            await api(`/requests/${selectedId}`, { method: "DELETE" });
+            setFlash({ type: "info", msg: "Solicitud eliminada." });
+            resetForm();
+            await loadData();
+        } catch (err) {
+            setFlash({
+                type: "danger",
+                msg: err.message || "No se pudo eliminar la solicitud.",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const left = (
         <Form onSubmit={handleSubmit}>
-            <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Tipo Solicitud:</Form.Label>
-                <Form.Select className="rounded-pill" value={form.tipo} onChange={(e) => setField("tipo", e.target.value)}>
-                    {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            {flash && (
+                <Alert
+                    variant={flash.type}
+                    onClose={() => setFlash(null)}
+                    dismissible
+                    className="py-2"
+                >
+                    {flash.msg}
+                </Alert>
+            )}
+
+            {!canManage && (
+                <Alert variant="info" className="py-2">
+                    Solo un <strong>admin/encargado autenticado</strong> puede crear
+                    solicitudes.
+                </Alert>
+            )}
+
+            <Form.Group className="mb-3" controlId="solTipo">
+                <Form.Label>Tipo de solicitud *</Form.Label>
+                <Form.Select
+                    name="tipo"
+                    value={form.tipo}
+                    onChange={handleChange}
+                    required
+                >
+                    <option value="prestamo">Préstamo</option>
+                    <option value="devolucion">Devolución</option>
+                    <option value="baja">Baja / retiro definitivo</option>
                 </Form.Select>
             </Form.Group>
 
-            <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Descripción:</Form.Label>
-                <Form.Control className="rounded-pill" placeholder="Ingrese descripción" value={form.descripcion}
-                    onChange={(e) => setField("descripcion", e.target.value)} />
+            <Form.Group className="mb-3" controlId="solPersona">
+                <Form.Label>Nombre solicitante *</Form.Label>
+                <Form.Control
+                    name="persona"
+                    value={form.persona}
+                    onChange={handleChange}
+                    placeholder="Ej: Juan Pérez"
+                    required
+                />
             </Form.Group>
 
-            <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Cantidad:</Form.Label>
-                <Form.Control type="number" min={1} className="rounded-pill" value={form.cantidad}
-                    onChange={(e) => setField("cantidad", Number(e.target.value))} />
+            <Form.Group className="mb-3" controlId="solEmail">
+                <Form.Label>Correo de contacto</Form.Label>
+                <Form.Control
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="Ej: juan@ejemplo.cl"
+                />
             </Form.Group>
 
-            <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Observación:</Form.Label>
-                <Form.Control className="rounded-pill" placeholder="Opcional" value={form.observacion}
-                    onChange={(e) => setField("observacion", e.target.value)} />
-            </Form.Group>
-
-            <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Persona:</Form.Label>
-                <Form.Select className="rounded-pill" value={form.persona} onChange={(e) => setField("persona", e.target.value)}>
-                    {PERSONAS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            <Form.Group className="mb-3" controlId="solItem">
+                <Form.Label>Equipo / recurso *</Form.Label>
+                <Form.Select
+                    name="itemId"
+                    value={form.itemId}
+                    onChange={handleChange}
+                    required
+                >
+                    <option value="">Selecciona un equipo...</option>
+                    {items.map((i) => (
+                        <option key={i.id} value={i.id}>
+                            {i.descripcion}
+                        </option>
+                    ))}
                 </Form.Select>
             </Form.Group>
 
-            <div className="d-grid gap-2 mb-2">
-                <Button type="submit" className="rounded-pill"
-                    style={{ backgroundColor: "var(--c-dark-1)", borderColor: "var(--c-dark-1)", paddingTop: "var(--btn-pad-y)", paddingBottom: "var(--btn-pad-y)" }}>
-                    {isEditing ? "Guardar" : "Crear"}
+            <Form.Group className="mb-3" controlId="solCantidad">
+                <Form.Label>Cantidad *</Form.Label>
+                <Form.Control
+                    type="number"
+                    min={1}
+                    name="cantidad"
+                    value={form.cantidad}
+                    onChange={handleChange}
+                    required
+                />
+            </Form.Group>
+
+            <Form.Group className="mb-3" controlId="solFecha">
+                <Form.Label>Fecha de uso</Form.Label>
+                <Form.Control
+                    type="date"
+                    name="fechaUso"
+                    value={form.fechaUso}
+                    onChange={handleChange}
+                />
+            </Form.Group>
+
+            <Form.Group className="mb-3" controlId="solObs">
+                <Form.Label>Detalle / observaciones</Form.Label>
+                <Form.Control
+                    as="textarea"
+                    rows={2}
+                    name="observacion"
+                    value={form.observacion}
+                    onChange={handleChange}
+                />
+            </Form.Group>
+
+            <ButtonGroup className="d-flex gap-2">
+                <Button type="submit" disabled={saving}>
+                    Enviar solicitud
                 </Button>
-            </div>
-
-            <div className="d-flex justify-content-between text-uppercase small mb-3">
-                <Button variant="link" className="text-decoration-none" disabled={!isEditing}>Editar</Button>
-                <Button variant="link" className="text-decoration-none" onClick={handleCancel}>Cancelar</Button>
-            </div>
-
-            <div className="d-grid gap-2">
-                <Button className="rounded-pill" style={{ backgroundColor: "var(--danger-900)", borderColor: "var(--danger-900)" }}
-                    onClick={handleDelete} disabled={!isEditing}>
-                    Dar de baja
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={resetForm}
+                    disabled={saving}
+                >
+                    Nueva
                 </Button>
+                <Button
+                    type="button"
+                    variant="outline-danger"
+                    onClick={handleDelete}
+                    disabled={!selectedId || saving}
+                >
+                    Eliminar
+                </Button>
+            </ButtonGroup>
 
-                <ButtonGroup className="w-100">
-                    <Button variant="light" className="rounded-pill flex-fill" onClick={() => setEstado(ESTADOS.APROBADA)} disabled={!canTransitionFromCreada}>Aprobar</Button>
-                    <Button variant="light" className="rounded-pill flex-fill" onClick={() => setEstado(ESTADOS.RECHAZADA)} disabled={!canTransitionFromCreada}>Rechazar</Button>
-                    <Button variant="light" className="rounded-pill flex-fill" onClick={() => setEstado(ESTADOS.PRESTAMO_EMITIDO)} disabled={!canEmitirPrestamo}>Emitir préstamo</Button>
-                </ButtonGroup>
-            </div>
+            {selected && (
+                <p className="mt-2 small text-muted">
+                    Seleccionada: <strong>{selected.persona}</strong> ({selected.itemNombre})
+                </p>
+            )}
         </Form>
     );
 
-    // ------- Right (table) -------
     const right = (
-        <Table hover responsive className="align-middle">
-            <thead>
-                <tr>
-                    <th style={{ width: 40 }}>#</th>
-                    <th>Descripción</th>
-                    <th>Solicitud</th>
-                    <th style={{ width: 110 }}>Cantidad</th>
-                    <th>Responsable</th>
-                    <th>Estado</th>
-                    <th>Observación</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows.map((r, idx) => (
-                    <tr key={r.id} onClick={() => handleSelect(r.id)} style={{ cursor: "pointer", background: selectedId === r.id ? "var(--brand-100)" : "transparent" }}>
-                        <td>{idx + 1}</td>
-                        <td>{r.descripcion}</td>
-                        <td>{TIPOS.find((t) => t.value === r.tipo)?.label ?? "-"}</td>
-                        <td>{r.cantidad}</td>
-                        <td>{r.persona}</td>
-                        <td><Badge bg={badgeVariant(r.estado)} className="text-uppercase">{r.estado}</Badge></td>
-                        <td>{r.observacion}</td>
-                    </tr>
-                ))}
-                {rows.length === 0 && <tr><td colSpan={7} className="text-center text-muted">Sin datos.</td></tr>}
-            </tbody>
-        </Table>
+        <>
+            <div className="d-flex justify-content-between align-items-center mb-3 gap-2">
+                <Form.Control
+                    placeholder="Buscar por nombre, equipo, tipo o estado..."
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                />
+            </div>
+
+            {error && (
+                <Alert
+                    variant="danger"
+                    onClose={() => setError(null)}
+                    dismissible
+                    className="py-2"
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {loading ? (
+                <div className="d-flex justify-content-center py-4">
+                    <Spinner animation="border" role="status" size="sm" className="me-2" />
+                    <span>Cargando solicitudes...</span>
+                </div>
+            ) : (
+                <Table hover responsive className="align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style={{ width: 40 }}>#</th>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Persona</th>
+                            <th>Equipo</th>
+                            <th className="text-end">Cant.</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredRows.length === 0 ? (
+                            <tr>
+                                <td colSpan={9} className="text-center text-muted py-4">
+                                    No hay solicitudes registradas.
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredRows.map((r, idx) => (
+                                <tr
+                                    key={r.id}
+                                    onClick={() => handleSelect(r)}
+                                    style={{ cursor: "pointer" }}
+                                    className={selectedId === r.id ? "table-active" : ""}
+                                >
+                                    <td>{idx + 1}</td>
+                                    <td className="small">{r.creado}</td>
+                                    <td className="text-capitalize">{r.tipo}</td>
+                                    <td>{r.persona}</td>
+                                    <td>{r.itemNombre}</td>
+                                    <td className="text-end">{r.cantidad}</td>
+                                    <td>
+                                        <Badge bg={estadoVariant(r.estado)}>
+                                            {String(r.estado || "").toUpperCase()}
+                                        </Badge>
+                                    </td>
+                                    <td>
+                                        <ButtonGroup size="sm">
+                                            <Button
+                                                variant="outline-success"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateEstado(r, "aprobada");
+                                                }}
+                                                disabled={saving}
+                                            >
+                                                Aprobar
+                                            </Button>
+                                            <Button
+                                                variant="outline-danger"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateEstado(r, "rechazada");
+                                                }}
+                                                disabled={saving}
+                                            >
+                                                Rechazar
+                                            </Button>
+                                        </ButtonGroup>
+                                    </td>
+                                    <td className="small text-muted">{r.observacion}</td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </Table>
+            )}
+        </>
     );
 
-    return <FormTableShell leftTitle="Formulario" rightTitle="Listado" left={left} right={right} leftMd={5} rightMd={7} />;
+    return (
+        <FormTableShell
+            leftTitle="Nueva solicitud"
+            rightTitle="Solicitudes registradas"
+            left={left}
+            right={right}
+            leftMd={5}
+            rightMd={7}
+        />
+    );
 }

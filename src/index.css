@@ -1,68 +1,87 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Reset básico */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #f4f0ff;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Colores principales (morado) */
+:root {
+  --purple-main: #6d28d9;
+  --purple-dark: #4c1d95;
+  --purple-soft: #ede9fe;
+  --gray-soft: #f8fafc;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* Navbar superior e inferior */
+.app-topbar {
+  background: #111827;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.app-tabsbar {
+  background: #1f2937;
+}
+
+.app-footer {
+  background: #111827;
+  color: #e5e7eb;
+}
+
+/* Card central */
+.app-main-card {
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+/* Buttons morados */
+.btn-primary {
+  background-color: var(--purple-main) !important;
+  border-color: var(--purple-main) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--purple-dark) !important;
+  border-color: var(--purple-dark) !important;
+}
+
+.btn-outline-primary {
+  color: var(--purple-main) !important;
+  border-color: var(--purple-main) !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  background-color: var(--purple-main) !important;
+  color: #ffffff !important;
+}
+
+/* Inputs un poco más suaves */
+.form-control,
+.form-select {
+  border-radius: 0.5rem;
+}
+
+/* Tablas */
+.table> :not(caption)>*>* {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Alert más compacto */
+.alert {
+  border-radius: 0.75rem;
 }
